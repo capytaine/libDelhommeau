@@ -7,19 +7,23 @@ src/matrices.f90
 
 OBJ=$(SRC:.f90=.o)
 
-LIB=lib/libDelhommeau.so
+LIBDIR=lib/
+DYNAMIC_LIB=$(LIBDIR)/libDelhommeau.so
+STATIC_LIB=$(LIBDIR)/libDelhommeau.a
 
-MODDIR=./tmp/
+$(STATIC_LIB): $(OBJ)
+	@mkdir -p $(LIBDIR)
+	ar r $(STATIC_LIB) $(OBJ)
 
-$(LIB): $(OBJ)
-	@mkdir -p lib/
-	gfortran -shared -o $(LIB) $(OBJ)
+$(DYNAMIC_LIB): $(OBJ)
+	@mkdir -p $(LIBDIR)
+	gfortran -shared -fPIC -o $(DYNAMIC_LIB) $(OBJ)
 
 %.o: %.f90
-	@mkdir -p $(MODDIR)
-	gfortran -cpp -c $< -J$(MODDIR) -o $@
+	@mkdir -p $(LIBDIR)
+	gfortran -cpp -c $< -J$(LIBDIR) -o $@
 
 .PHONY: clean
 
 clean:
-	rm -rf $(OBJ) $(MODDIR) $(LIB)
+	rm -rf $(OBJ) $(LIBDIR)
