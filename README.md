@@ -7,7 +7,7 @@ If you're not sure what this means, you might want to use Capytaine instead.
 Please report issue and submit pull request in Capytaine repository.
 
 ## TODO
-* Makefile
+* Example of program
 
 ## Authors
 Matthieu Ancellin, based on the work of Gérard Delhommeau, Aurélien Babarit, and other contributors to the aforementioned codes.
