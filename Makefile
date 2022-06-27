@@ -1,7 +1,7 @@
 
 SRC=src/constants.f90\
 src/Green_Rankine.f90\
-src/Initialize_Green_wave.f90\
+src/Delhommeau_integrals.f90\
 src/Green_wave.f90\
 src/matrices.f90
 
