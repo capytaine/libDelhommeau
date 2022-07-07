@@ -1,7 +1,9 @@
 program test
 
+  use ieee_arithmetic
+
   use matrices, only: build_matrices
-  use initialize_green_wave, only: initialize_tabulated_integrals
+  use delhommeau_integrals, only: default_r_spacing, default_z_spacing, construct_tabulation
   use constants, only: pre  ! Floating point precision
 
   implicit none
@@ -23,11 +25,11 @@ program test
   real(kind=pre), dimension(nb_faces, nb_quadrature_points) :: quadrature_weights
 
   ! Tabulation of the integrals used in the Green function
-  integer, parameter :: tabulation_x = 328
-  integer, parameter :: tabulation_z = 46
-  real(kind=pre), dimension(tabulation_x)                      :: x
-  real(kind=pre), dimension(tabulation_z)                      :: z
-  real(kind=pre), dimension(tabulation_x, tabulation_z, 2, 2)  :: tabulation
+  integer, parameter :: tabulation_nr = 328
+  integer, parameter :: tabulation_nz = 46
+  real(kind=pre), dimension(tabulation_nr)                       :: tabulated_r
+  real(kind=pre), dimension(tabulation_nz)                       :: tabulated_z
+  real(kind=pre), dimension(tabulation_nr, tabulation_nz, 2, 2)  :: tabulated_integrals
 
   ! Prony decomposition for the finite depth Green function
   integer, parameter    :: nexp = 31
@@ -36,27 +38,37 @@ program test
   ! The interaction matrices to be computed
   complex(kind=pre), dimension(nb_faces, nb_faces) :: S, K
 
+  tabulated_r(:) = default_r_spacing(tabulation_nr)
+  tabulated_z(:) = default_z_spacing(tabulation_nz)
+  tabulated_integrals(:, :, :, :) = construct_tabulation(tabulated_r, tabulated_z, 251)
+
   wavenumber = 1.0
-  depth = 0.0  ! means infinite depth
+  depth = ieee_value(depth, ieee_positive_inf)
 
   vertices = reshape([  &
-                      0.0, 0.0, -1.0,  &
-                      1.0, 0.0, -1.0,  &
-                      1.0, 1.0, -1.0,  &
-                      0.0, 1.0, -1.0,  &
-                      1.0, 0.0, -1.0,  &
-                      2.0, 0.0, -1.0,  &
-                      2.0, 1.0, -1.0,  &
-                      1.0, 1.0, -1.0   &
-                      ], shape(vertices))
-  faces = reshape([1, 2, 3, 4, 5, 6, 7, 8], shape(faces))
-                    
-  face_center = reshape([0.5, 0.5, -1.0,  &
-                         1.5, 0.5, -1.0], &
-                        shape(face_center))
-  face_normal = reshape([0.0, 0.0, 1.0,  &
-                         0.0, 0.0, 1.0], &
-                        shape(face_normal))
+    0.0,  1.0,  1.0,  0.0,  1.0,  2.0,  2.0,  1.0,  &
+    0.0,  0.0,  1.0,  1.0,  0.0,  0.0,  1.0,  1.0,  &
+    -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0  &
+    ], shape(vertices))
+
+  faces = reshape([  &
+    1, 5, &
+    2, 6, &
+    3, 7, &
+    4, 8  &
+    ], shape(faces))
+
+  face_center = reshape([  &
+    0.5,  1.5,  &
+    0.5,  0.5,  &
+    -1.0, -1.0  &
+    ], shape(face_center))
+
+  face_normal = reshape([  &
+    0.0, 0.0,  &
+    0.0, 0.0,  &
+    1.0, 1.0   &
+    ], shape(face_normal))
 
   face_area = [1.0, 1.0]
   face_radius = [0.71, 0.71]
@@ -70,10 +82,10 @@ program test
     face_center, face_normal, face_area, face_radius,            &
     nb_quadrature_points, quadrature_points, quadrature_weights, &
     wavenumber, depth,                                           &
-    [0d0, -0d0, 1d0],                                            &
-    x, z, tabulation,                                            &
+    [1d0, -1d0, 1d0],                                            &
+    tabulated_r, tabulated_z, tabulated_integrals,               &
     nexp, ambda, ar,                                             &
-    .false.,                                                      &
+    .true.,                                                      &
     S, K)
 
   print*, S
