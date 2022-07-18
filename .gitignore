@@ -1,4 +1,4 @@
 *.o
 *.mod
+*.bin
 lib/
-bin/

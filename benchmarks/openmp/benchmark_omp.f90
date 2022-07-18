@@ -1,5 +1,6 @@
 program benchmarck_omp
 
+use omp_lib
 use ieee_arithmetic
 
 use matrices, only: build_matrices
@@ -10,7 +11,7 @@ implicit none
 
 integer(kind=8) :: starting_time, final_time, clock_rate
 
-integer, parameter :: nb_faces = 100
+integer, parameter :: nb_faces = 5000
 integer, parameter :: nb_vertices = 4*nb_faces
 integer, parameter :: nb_quadrature_points = 1
 
@@ -37,6 +38,8 @@ real(kind=pre), dimension(tabulation_nr, tabulation_nz, 2, 2)  :: tabulated_inte
 integer, parameter    :: nexp = 31
 real(kind=pre), dimension(nexp) :: ambda, ar
 
+integer n_threads
+
 ! The interaction matrices to be computed
 complex(kind=pre), dimension(:, :), allocatable :: S, K
 
@@ -61,23 +64,28 @@ quadrature_weights = reshape(face_area, shape(quadrature_weights))
 ! end do
 
 call system_clock(count_rate=clock_rate)
-call system_clock(starting_time)
 
-call build_matrices(                                           &
-  nb_faces, face_center, face_normal,                          &
-  nb_vertices, nb_faces, vertices, faces,                      &
-  face_center, face_normal, face_area, face_radius,            &
-  nb_quadrature_points, quadrature_points, quadrature_weights, &
-  wavenumber, depth,                                           &
-  [1d0, -1d0, 1d0],                                            &
-  tabulated_r, tabulated_z, tabulated_integrals,               &
-  nexp, ambda, ar,                                             &
-  .true.,                                                      &
-  S, K)
+do n_threads = 1, 6
+  call omp_set_num_threads(n_threads)
 
-call system_clock(final_time)
+  call system_clock(starting_time)
 
-print*, "Elapsed time:", real(final_time - starting_time)/clock_rate
+  call build_matrices(                                           &
+    nb_faces, face_center, face_normal,                          &
+    nb_vertices, nb_faces, vertices, faces,                      &
+    face_center, face_normal, face_area, face_radius,            &
+    nb_quadrature_points, quadrature_points, quadrature_weights, &
+    wavenumber, depth,                                           &
+    [1d0, -1d0, 1d0],                                            &
+    tabulated_r, tabulated_z, tabulated_integrals,               &
+    nexp, ambda, ar,                                             &
+    .true.,                                                      &
+    S, K)
+
+  call system_clock(final_time)
+
+  print*, n_threads, "threads. Elapsed time:", real(final_time - starting_time)/clock_rate
+enddo
 
 contains
 

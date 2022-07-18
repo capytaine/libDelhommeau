@@ -1,11 +1,10 @@
-all: clean run
+all: run
 
 DEBUG_COMPILE_OPTIONS=-g -Wall -Wextra -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=invalid,zero,overflow,underflow -finit-real=nan
 # COMPILE_OPTIONS=$(DEBUG_COMPILE_OPTIONS) -cpp #-fopenmp
 COMPILE_OPTIONS=-cpp -fopenmp
 
 LIBDIR=./lib
-BINDIR=./bin
 
 SRC=src/constants.f90\
 src/Green_Rankine.f90\
@@ -29,29 +28,24 @@ OBJ=$(SRC:.f90=.o)
 # 	@mkdir -p $(LIBDIR)
 # 	gfortran -shared -fPIC $(COMPILE_OPTIONS) -o $(DYNAMIC_LIB) $(OBJ)
 
-#####################
-#  Minimal example  #
-#####################
-MINIMAL_SRC=examples/minimal/minimal_example.f90
-MINIMAL_BIN=$(BINDIR)/minimal
-$(MINIMAL_BIN): $(MINIMAL_SRC) $(OBJ)
-	@mkdir -p $(BINDIR)
-	gfortran $(COMPILE_OPTIONS) $(MINIMAL_SRC) -o $(OBJ) -I$(LIBDIR) -o $(MINIMAL_BIN)
+EXAMPLES_SRC=examples/minimal/minimal_example.f90
+EXAMPLES_BIN=$(EXAMPLES_SRC:.f90=.bin)
 
-#######################
-#  Benchmark example  #
-#######################
-BENCHMARK_SRC=examples/benchmark/benchmark.f90
-BENCHMARK_BIN=$(BINDIR)/benchmark
-$(BENCHMARK_BIN): $(BENCHMARK_SRC) $(OBJ)
-	@mkdir -p $(BINDIR)
-	gfortran $(BENCHMARK_SRC) -o $(OBJ) -I$(LIBDIR) -L$(LIBDIR) $(COMPILE_OPTIONS) -o $(BENCHMARK_BIN)
+BENCHMARKS_SRC=\
+benchmarks/openmp/benchmark_omp.f90\
+benchmarks/tabulations/benchmark_tabulation.f90
 
-run: $(MINIMAL_BIN) $(BENCHMARK_BIN)
-	$(MINIMAL_BIN)
-	$(BENCHMARK_BIN)
+BENCHMARKS_BIN=$(BENCHMARKS_SRC:.f90=.bin)
+
+%.bin: %.f90 $(OBJ)
+	gfortran $(COMPILE_OPTIONS) -I$(LIBDIR) $^ -o $@
+
+run :$(EXAMPLES_BIN) $(BENCHMARKS_BIN)
+	examples/minimal/minimal_example.bin
+	# benchmarks/openmp/benchmark_omp.bin
+	# benchmarks/tabulations/benchmark_tabulation.bin
 
 clean:
-	rm -rf $(OBJ) $(LIBDIR) $(BINDIR)
+	rm -rf $(OBJ) $(LIBDIR) $(EXAMPLES_BIN) $(BENCHMARKS_BIN)
 
 .PHONY: all run clean
