@@ -4,7 +4,7 @@ use ieee_arithmetic
 
 use matrices, only: build_matrices
 use delhommeau_integrals, only: default_r_spacing, default_z_spacing, construct_tabulation
-use constants, only: pi, pre  ! Floating point precision
+use constants, only: pre  ! Floating point precision
 
 implicit none
 
@@ -38,7 +38,10 @@ integer, parameter    :: nexp = 31
 real(kind=pre), dimension(nexp) :: ambda, ar
 
 ! The interaction matrices to be computed
-complex(kind=pre), dimension(nb_faces, nb_faces) :: S, K
+complex(kind=pre), dimension(:, :), allocatable :: S, K
+
+allocate(S(nb_faces, nb_faces))
+allocate(K(nb_faces, nb_faces))
 
 tabulated_r(:) = default_r_spacing(tabulation_nr)
 tabulated_z(:) = default_z_spacing(tabulation_nz)
@@ -48,15 +51,14 @@ wavenumber = 1.0
 depth = ieee_value(depth, ieee_positive_inf)
 
 call random_panels(nb_faces, vertices, faces, face_center, face_normal, face_area, face_radius)
+quadrature_points = reshape(face_center, shape(quadrature_points))
+quadrature_weights = reshape(face_area, shape(quadrature_weights))
 
 ! ! For debugging
 ! open (unit=4, file='vertices.dat', form='formatted')
 ! do i = 1, 4*nb_faces
 !    write (4, *) vertices(i, :)
 ! end do
-
-quadrature_points = reshape(face_center, shape(quadrature_points))
-quadrature_weights = reshape(face_area, shape(quadrature_weights))
 
 call system_clock(count_rate=clock_rate)
 call system_clock(starting_time)
@@ -76,7 +78,6 @@ call build_matrices(                                           &
 call system_clock(final_time)
 
 print*, "Elapsed time:", real(final_time - starting_time)/clock_rate
-
 
 contains
 
