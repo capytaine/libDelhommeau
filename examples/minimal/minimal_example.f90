@@ -15,21 +15,21 @@ program test
   real(kind=pre) :: wavenumber, depth
 
   ! Geometry of the mesh
-  real(kind=pre), dimension(nb_vertices, 3) :: vertices
-  integer, dimension(nb_faces, 4) :: faces
-  real(kind=pre), dimension(nb_faces, 3) :: face_center
-  real(kind=pre), dimension(nb_faces, 3) :: face_normal
+  real(kind=pre), dimension(3, nb_vertices) :: vertices
+  integer, dimension(4, nb_faces) :: faces
+  real(kind=pre), dimension(3, nb_faces) :: face_center
+  real(kind=pre), dimension(3, nb_faces) :: face_normal
   real(kind=pre), dimension(nb_faces) :: face_area
   real(kind=pre), dimension(nb_faces) :: face_radius
-  real(kind=pre), dimension(nb_faces, nb_quadrature_points, 3) :: quadrature_points
-  real(kind=pre), dimension(nb_faces, nb_quadrature_points) :: quadrature_weights
+  real(kind=pre), dimension(3, nb_quadrature_points, nb_faces) :: quadrature_points
+  real(kind=pre), dimension(nb_quadrature_points, nb_faces) :: quadrature_weights
 
   ! Tabulation of the integrals used in the Green function
   integer, parameter :: tabulation_nr = 328
   integer, parameter :: tabulation_nz = 46
   real(kind=pre), dimension(tabulation_nr)                       :: tabulated_r
   real(kind=pre), dimension(tabulation_nz)                       :: tabulated_z
-  real(kind=pre), dimension(tabulation_nr, tabulation_nz, 2, 2)  :: tabulated_integrals
+  real(kind=pre), dimension(2, 2, tabulation_nr, tabulation_nz)  :: tabulated_integrals
 
   ! Prony decomposition for the finite depth Green function
   integer, parameter    :: nexp = 31
@@ -47,29 +47,26 @@ program test
   depth = ieee_value(depth, ieee_positive_inf)
 
   vertices = reshape([  &
-    0.0,  1.0,  1.0,  0.0,  1.0,  2.0,  2.0,  1.0,  &
-    0.0,  0.0,  1.0,  1.0,  0.0,  0.0,  1.0,  1.0,  &
-    -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0  &
-    ], shape(vertices))
+                      0.0, 0.0, -1.0,  &
+                      1.0, 0.0, -1.0,  &
+                      1.0, 1.0, -1.0,  &
+                      0.0, 1.0, -1.0,  &
+                      1.0, 0.0, -1.0,  &
+                      2.0, 0.0, -1.0,  &
+                      2.0, 1.0, -1.0,  &
+                      1.0, 1.0, -1.0   &
+                      ], shape(vertices))
 
-  faces = reshape([  &
-    1, 5, &
-    2, 6, &
-    3, 7, &
-    4, 8  &
-    ], shape(faces))
+  face_center = reshape([0.5, 0.5, -1.0,  &
+                         1.5, 0.5, -1.0], &
+                        shape(face_center))
 
-  face_center = reshape([  &
-    0.5,  1.5,  &
-    0.5,  0.5,  &
-    -1.0, -1.0  &
-    ], shape(face_center))
+  face_normal = reshape([0.0, 0.0, 1.0,  &
+                         0.0, 0.0, 1.0], &
+                        shape(face_normal))
 
-  face_normal = reshape([  &
-    0.0, 0.0,  &
-    0.0, 0.0,  &
-    1.0, 1.0   &
-    ], shape(face_normal))
+  faces = reshape([1, 2, 3, 4, 5, 6, 7, 8], shape(faces))
+
 
   face_area = [1.0, 1.0]
   face_radius = [0.71, 0.71]

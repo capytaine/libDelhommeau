@@ -172,13 +172,13 @@ contains
     integer,        intent(in) :: nb_integration_points
     real(kind=pre), dimension(:), intent(in) :: r_range
     real(kind=pre), dimension(:), intent(in) :: z_range
-    real(kind=pre), dimension(size(r_range), size(z_range), 2, 2) :: tabulation
+    real(kind=pre), dimension(2, 2, size(r_range), size(z_range)) :: tabulation
 
     integer :: i, j
 
     do concurrent (j = 1:size(z_range))
       do concurrent (i = 1:size(r_range))
-        tabulation(i, j, :, :) = numerical_integration(r_range(i), z_range(j), nb_integration_points)
+        tabulation(:, :, i, j) = numerical_integration(r_range(i), z_range(j), nb_integration_points)
       enddo
     enddo
 
@@ -224,7 +224,7 @@ contains
     real(kind=pre), intent(in) :: z
     real(kind=pre), dimension(:), intent(in) :: r_range
     real(kind=pre), dimension(:), intent(in) :: z_range
-    real(kind=pre), dimension(size(r_range), size(z_range), 2, 2), intent(in) :: tabulation
+    real(kind=pre), dimension(2, 2, size(r_range), size(z_range)), intent(in) :: tabulation
 
     ! output
     real(kind=pre), dimension(2, 2) :: integrals
@@ -238,7 +238,7 @@ contains
     integrals(:, :) = lagrange_polynomial_interpolation( &
       r, z,                                              &
       r_range(i-1:i+1), z_range(j-1:j+1),                &
-      tabulation(i-1:i+1, j-1:j+1, :, :)                 &
+      tabulation(:, :, i-1:i+1, j-1:j+1)                 &
       )
 
   contains
@@ -275,7 +275,7 @@ contains
       real(kind=pre),                        intent(in) :: r, z
       real(kind=pre), dimension(3),          intent(in) :: local_r_range
       real(kind=pre), dimension(3),          intent(in) :: local_z_range
-      real(kind=pre), dimension(3, 3, 2, 2), intent(in) :: local_tabulation
+      real(kind=pre), dimension(2, 2, 3, 3), intent(in) :: local_tabulation
 
       ! output
       real(kind=pre), dimension(2, 2) :: integrals
@@ -290,10 +290,10 @@ contains
       zl(2) = pl2(local_z_range(3), local_z_range(1), local_z_range(2), z)
       zl(3) = pl2(local_z_range(1), local_z_range(2), local_z_range(3), z)
 
-      integrals(1, 1) = dot_product(xl, matmul(local_tabulation(:, :, 1, 1), zl))
-      integrals(2, 1) = dot_product(xl, matmul(local_tabulation(:, :, 2, 1), zl))
-      integrals(1, 2) = dot_product(xl, matmul(local_tabulation(:, :, 1, 2), zl))
-      integrals(2, 2) = dot_product(xl, matmul(local_tabulation(:, :, 2, 2), zl))
+      integrals(1, 1) = dot_product(xl, matmul(local_tabulation(1, 1, :, :), zl))
+      integrals(2, 1) = dot_product(xl, matmul(local_tabulation(2, 1, :, :), zl))
+      integrals(1, 2) = dot_product(xl, matmul(local_tabulation(1, 2, :, :), zl))
+      integrals(2, 2) = dot_product(xl, matmul(local_tabulation(2, 2, :, :), zl))
     end function lagrange_polynomial_interpolation
 
     pure function pl2(u1, u2, u3, xu)

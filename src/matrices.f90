@@ -33,15 +33,15 @@ CONTAINS
 
     ! Mesh data
     INTEGER,                                     INTENT(IN) :: nb_faces_1, nb_faces_2, nb_vertices_2
-    REAL(KIND=PRE), DIMENSION(nb_faces_1, 3),    INTENT(IN) :: centers_1, normals_1
-    REAL(KIND=PRE), DIMENSION(nb_vertices_2, 3), INTENT(IN) :: vertices_2
-    INTEGER,        DIMENSION(nb_faces_2, 4),    INTENT(IN) :: faces_2
-    REAL(KIND=PRE), DIMENSION(nb_faces_2, 3),    INTENT(IN) :: centers_2, normals_2
+    REAL(KIND=PRE), DIMENSION(3, nb_faces_1),    INTENT(IN) :: centers_1, normals_1
+    REAL(KIND=PRE), DIMENSION(3, nb_vertices_2), INTENT(IN) :: vertices_2
+    INTEGER,        DIMENSION(4, nb_faces_2),    INTENT(IN) :: faces_2
+    REAL(KIND=PRE), DIMENSION(3, nb_faces_2),    INTENT(IN) :: centers_2, normals_2
     REAL(KIND=PRE), DIMENSION(nb_faces_2),       INTENT(IN) :: areas_2, radiuses_2
 
     INTEGER,                                                  INTENT(IN) :: nb_quad_points
-    REAL(KIND=PRE), DIMENSION(nb_faces_2, nb_quad_points, 3), INTENT(IN) :: quad_points
-    REAL(KIND=PRE), DIMENSION(nb_faces_2, nb_quad_points),    INTENT(IN) :: quad_weights
+    REAL(KIND=PRE), DIMENSION(3, nb_quad_points, nb_faces_2), INTENT(IN) :: quad_points
+    REAL(KIND=PRE), DIMENSION(nb_quad_points, nb_faces_2),    INTENT(IN) :: quad_weights
 
     LOGICAL,                                  INTENT(IN) :: same_body
 
@@ -52,7 +52,7 @@ CONTAINS
     ! Tabulated data
     REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_r_range
     REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_z_range
-    REAL(KIND=PRE), DIMENSION(size(tabulated_r_range), size(tabulated_z_range), 2, 2), INTENT(IN) :: tabulated_integrals
+    REAL(KIND=PRE), DIMENSION(2, 2, size(tabulated_r_range), size(tabulated_z_range)), INTENT(IN) :: tabulated_integrals
 
     ! Prony decomposition for finite depth
     INTEGER,                                  INTENT(IN) :: NEXP
@@ -89,10 +89,10 @@ CONTAINS
         DO I = 1, nb_faces_1
 
           CALL COMPUTE_INTEGRAL_OF_RANKINE_SOURCE( &
-            centers_1(I, :),                       &
-            vertices_2(faces_2(J, :), :),          &
-            centers_2(J, :),                       &
-            normals_2(J, :),                       &
+            centers_1(:, I),                       &
+            vertices_2(:, faces_2(:, J)),          &
+            centers_2(:, J),                       &
+            normals_2(:, J),                       &
             areas_2(J),                            &
             radiuses_2(J),                         &
             SP1, VSP1                              &
@@ -100,7 +100,7 @@ CONTAINS
 
           ! Store into influence matrix
           S(I, J) = S(I, J) - coeffs(1) * SP1/(4*PI)                                ! Green function
-          K(I, J) = K(I, J) - coeffs(1) * DOT_PRODUCT(normals_1(I, :), VSP1)/(4*PI) ! Gradient of the Green function
+          K(I, J) = K(I, J) - coeffs(1) * DOT_PRODUCT(normals_1(:, I), VSP1)/(4*PI) ! Gradient of the Green function
 
         END DO
       END IF
@@ -115,26 +115,26 @@ CONTAINS
 
           IF (is_infinity(depth)) THEN
             ! Reflection through free surface
-            reflected_centers_1_I(1:2) = centers_1(I, 1:2)
-            reflected_centers_1_I(3)   = -centers_1(I, 3)
+            reflected_centers_1_I(1:2) = centers_1(1:2, I)
+            reflected_centers_1_I(3)   = -centers_1(3, I)
           ELSE
             ! Reflection through sea bottom
-            reflected_centers_1_I(1:2) = centers_1(I, 1:2)
-            reflected_centers_1_I(3)   = -centers_1(I, 3) - 2*depth
+            reflected_centers_1_I(1:2) = centers_1(1:2, I)
+            reflected_centers_1_I(3)   = -centers_1(3, I) - 2*depth
           END IF
 
-          reflected_normals_1_I(1:2) = normals_1(I, 1:2)
-          reflected_normals_1_I(3)   = -normals_1(I, 3)
-
           CALL COMPUTE_INTEGRAL_OF_RANKINE_SOURCE( &
-            reflected_centers_1_I(:),                &
-            vertices_2(faces_2(J, :), :),          &
+            reflected_centers_1_I(:),              &
+            vertices_2(:, faces_2(:, J)),          &
             centers_2(J, :),                       &
             normals_2(J, :),                       &
             areas_2(J),                            &
             radiuses_2(J),                         &
             SP1, VSP1                              &
             )
+
+          reflected_normals_1_I(1:2) = normals_1(1:2, I)
+          reflected_normals_1_I(3)   = -normals_1(3, I)
 
           ! Store into influence matrix
           S(I, J) = S(I, J) - coeffs(2) * SP1/(4*PI)                                ! Green function
@@ -156,8 +156,8 @@ CONTAINS
           DO I = J, nb_faces_1
               IF (is_infinity(depth)) THEN
                 CALL WAVE_PART_INFINITE_DEPTH &
-                  (centers_1(I, :),           &
-                  quad_points(J, 1, :),       & ! centers_2(J, :),
+                  (centers_1(:, I),           &
+                  quad_points(:, 1, J),       & ! centers_2(:, J),
                   wavenumber,                 &
                   tabulated_r_range, tabulated_z_range, tabulated_integrals, &
                   SP2, VSP2_SYM               &
@@ -165,8 +165,8 @@ CONTAINS
                 VSP2_ANTISYM(:) = ZERO
               ELSE
                 CALL WAVE_PART_FINITE_DEPTH   &
-                  (centers_1(I, :),           &
-                  quad_points(J, 1, :),       & ! centers_2(J, :),
+                  (centers_1(:, I),           &
+                  quad_points(:, 1, J),       & ! centers_2(:, J),
                   wavenumber,                 &
                   depth,                      &
                   tabulated_r_range, tabulated_z_range, tabulated_integrals, &
@@ -175,15 +175,15 @@ CONTAINS
                   )
               END IF
 
-              S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, 1)
+              S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(1, J)
               K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
-                DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, 1)
+                DOT_PRODUCT(normals_1(:, I), VSP2_SYM + VSP2_ANTISYM) * quad_weights(1, J)
 
               IF (.NOT. I==J) THEN
                 VSP2_SYM(1:2) = -VSP2_SYM(1:2)
-                S(J, I) = S(J, I) - coeffs(3)/(4*PI) * SP2 * quad_weights(I, 1)
+                S(J, I) = S(J, I) - coeffs(3)/(4*PI) * SP2 * quad_weights(1, I)
                 K(J, I) = K(J, I) - coeffs(3)/(4*PI) * &
-                  DOT_PRODUCT(normals_1(J, :), VSP2_SYM - VSP2_ANTISYM) * quad_weights(I, 1)
+                  DOT_PRODUCT(normals_1(:, J), VSP2_SYM - VSP2_ANTISYM) * quad_weights(1, I)
               END IF
           END DO
 
@@ -194,8 +194,8 @@ CONTAINS
             DO Q = 1, nb_quad_points
               IF (is_infinity(depth)) THEN
                 CALL WAVE_PART_INFINITE_DEPTH &
-                  (centers_1(I, :),           &
-                  quad_points(J, Q, :),       & ! centers_2(J, :),
+                  (centers_1(:, I),           &
+                  quad_points(:, Q, J),       & ! centers_2(:, J),
                   wavenumber,                 &
                   tabulated_r_range, tabulated_z_range, tabulated_integrals, &
                   SP2, VSP2_SYM               &
@@ -203,8 +203,8 @@ CONTAINS
                 VSP2_ANTISYM(:) = ZERO
               ELSE
                 CALL WAVE_PART_FINITE_DEPTH   &
-                  (centers_1(I, :),           &
-                  quad_points(J, Q, :),       & ! centers_2(J, :),
+                  (centers_1(:, I),           &
+                  quad_points(:, Q, J),       & ! centers_2(J, :),
                   wavenumber,                 &
                   depth,                      &
                   tabulated_r_range, tabulated_z_range, tabulated_integrals, &
@@ -213,9 +213,9 @@ CONTAINS
                   )
               END IF
 
-              S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, Q)
+              S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(Q, J)
               K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
-                DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, Q)
+                DOT_PRODUCT(normals_1(:, I), VSP2_SYM + VSP2_ANTISYM) * quad_weights(Q, J)
 
             END DO
           END DO

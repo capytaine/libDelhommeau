@@ -18,21 +18,21 @@ integer, parameter :: nb_quadrature_points = 1
 real(kind=pre) :: wavenumber, depth
 
 ! Geometry of the mesh
-real(kind=pre), dimension(nb_vertices, 3) :: vertices
-integer, dimension(nb_faces, 4) :: faces
-real(kind=pre), dimension(nb_faces, 3) :: face_center
-real(kind=pre), dimension(nb_faces, 3) :: face_normal
+real(kind=pre), dimension(3, nb_vertices) :: vertices
+integer, dimension(4, nb_faces) :: faces
+real(kind=pre), dimension(3, nb_faces) :: face_center
+real(kind=pre), dimension(3, nb_faces) :: face_normal
 real(kind=pre), dimension(nb_faces) :: face_area
 real(kind=pre), dimension(nb_faces) :: face_radius
-real(kind=pre), dimension(nb_faces, nb_quadrature_points, 3) :: quadrature_points
-real(kind=pre), dimension(nb_faces, nb_quadrature_points) :: quadrature_weights
+real(kind=pre), dimension(3, nb_quadrature_points, nb_faces) :: quadrature_points
+real(kind=pre), dimension(nb_quadrature_points, nb_faces) :: quadrature_weights
 
 ! Tabulation of the integrals used in the Green function
 integer, parameter :: tabulation_nr = 328
 integer, parameter :: tabulation_nz = 46
 real(kind=pre), dimension(tabulation_nr)                       :: tabulated_r
 real(kind=pre), dimension(tabulation_nz)                       :: tabulated_z
-real(kind=pre), dimension(tabulation_nr, tabulation_nz, 2, 2)  :: tabulated_integrals
+real(kind=pre), dimension(2, 2, tabulation_nr, tabulation_nz)  :: tabulated_integrals
 
 ! Prony decomposition for the finite depth Green function
 integer, parameter    :: nexp = 31
@@ -128,17 +128,17 @@ contains
   subroutine random_panels(nb_faces, vertices, faces, face_center, face_normal, face_area, face_radius)
     integer, intent(in) :: nb_faces
 
-    integer, dimension(nb_faces, 4), intent(out) :: faces
-    real(kind=pre), dimension(4*nb_faces, 3), intent(out) :: vertices
-    real(kind=pre), dimension(nb_faces, 3), intent(out) :: face_center
-    real(kind=pre), dimension(nb_faces, 3), intent(out) :: face_normal
+    integer, dimension(4, nb_faces), intent(out) :: faces
+    real(kind=pre), dimension(3, 4*nb_faces), intent(out) :: vertices
+    real(kind=pre), dimension(3, nb_faces), intent(out) :: face_center
+    real(kind=pre), dimension(3, nb_faces), intent(out) :: face_normal
     real(kind=pre), dimension(nb_faces), intent(out) :: face_area
     real(kind=pre), dimension(nb_faces), intent(out) :: face_radius
 
     real(kind=pre), dimension(3, 2) :: vertex_shifts
     integer :: i
 
-    faces = transpose(reshape([(i, i=1,(nb_faces*4),1)], [4, nb_faces]))
+    faces = reshape([(i, i=1,(nb_faces*4),1)], [4, nb_faces])
 
     call random_number(face_area)
     face_area = 1.0 + face_area
@@ -146,22 +146,22 @@ contains
     face_radius = face_area * sqrt(2.0)/2.0
 
     call random_number(face_center)
-    face_center(:, 1) = 20*(face_center(:, 1) - 0.5)
-    face_center(:, 2) = 20*(face_center(:, 2) - 0.5)
-    face_center(:, 3) = -10*face_center(:, 3) - face_radius(:)
+    face_center(1, :) = 20*(face_center(1, :) - 0.5)
+    face_center(2, :) = 20*(face_center(2, :) - 0.5)
+    face_center(3, :) = -10*face_center(3, :) - face_radius(:)
 
     call random_number(face_normal)
     face_normal(:, :) = face_normal(:, :) - 0.5
     do i = 1, nb_faces
-      face_normal(i, :) = face_normal(i, :)/norm2(face_normal(i, :))
+      face_normal(:, i) = face_normal(:, i)/norm2(face_normal(:, i))
     enddo
 
     do i = 1, nb_faces
-      vertex_shifts = face_radius(i) * two_orthogonal_vector(face_normal(i, :))
-      vertices(4*(i-1)+1, :) = face_center(i, :) + vertex_shifts(:, 1)
-      vertices(4*(i-1)+2, :) = face_center(i, :) + vertex_shifts(:, 2)
-      vertices(4*(i-1)+3, :) = face_center(i, :) - vertex_shifts(:, 1)
-      vertices(4*(i-1)+4, :) = face_center(i, :) - vertex_shifts(:, 2)
+      vertex_shifts = face_radius(i) * two_orthogonal_vector(face_normal(:, i))
+      vertices(:, 4*(i-1)+1) = face_center(:, i) + vertex_shifts(:, 1)
+      vertices(:, 4*(i-1)+2) = face_center(:, i) + vertex_shifts(:, 2)
+      vertices(:, 4*(i-1)+3) = face_center(:, i) - vertex_shifts(:, 1)
+      vertices(:, 4*(i-1)+4) = face_center(:, i) - vertex_shifts(:, 2)
     enddo
   end subroutine
 
