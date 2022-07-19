@@ -65,6 +65,9 @@ quadrature_weights = reshape(face_area, shape(quadrature_weights))
 
 call system_clock(count_rate=clock_rate)
 
+open(unit=210, file="benchmark_results.csv")
+write(210, *) "n_threads, elapsed_time"
+
 do n_threads = 1, 6
   call omp_set_num_threads(n_threads)
 
@@ -85,6 +88,7 @@ do n_threads = 1, 6
   call system_clock(final_time)
 
   print*, n_threads, "threads. Elapsed time:", real(final_time - starting_time)/clock_rate
+  write(210, *) n_threads, ",", real(final_time - starting_time)/clock_rate
 enddo
 
 contains
