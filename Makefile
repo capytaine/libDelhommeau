@@ -1,8 +1,8 @@
 all: run
 
-DEBUG_COMPILE_OPTIONS=-g -Wall -Wextra -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=invalid,zero,overflow,underflow -finit-real=nan
-# COMPILE_OPTIONS=$(DEBUG_COMPILE_OPTIONS) -cpp #-fopenmp
-COMPILE_OPTIONS=-cpp -fopenmp
+DEBUG_COMPILE_OPTIONS=-g -Wall -Wextra -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all # -ffpe-trap=invalid,zero,overflow,underflow -finit-real=nan
+COMPILE_OPTIONS=$(DEBUG_COMPILE_OPTIONS) -cpp -fopenmp
+# COMPILE_OPTIONS=-cpp -fopenmp
 
 LIBDIR=./lib
 
@@ -40,7 +40,7 @@ BENCHMARKS_BIN=$(BENCHMARKS_SRC:.f90=.bin)
 %.bin: %.f90 $(OBJ)
 	gfortran $(COMPILE_OPTIONS) -I$(LIBDIR) $^ -o $@
 
-run :$(EXAMPLES_BIN)
+run: clean $(EXAMPLES_BIN)
 	examples/minimal/minimal_example.bin
 	python examples/minimal/same_in_Capytaine.py
 	# benchmarks/tabulations/benchmark_tabulation.bin
@@ -53,7 +53,7 @@ $(BENCHMARK_RESULT): $(BENCHMARKS_BIN)
 	mkdir -p $(BENCHMARK_RESULTS_DIR)
 	mv benchmark_results.csv $(BENCHMARK_RESULT)
 
-benchmark: $(BENCHMARK_RESULT)
+benchmark: clean $(BENCHMARK_RESULT)
 	python benchmarks/openmp/read_output.py
 
 clean:
