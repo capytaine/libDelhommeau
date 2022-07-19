@@ -38,11 +38,12 @@ program test
   ! The interaction matrices to be computed
   complex(kind=pre), dimension(nb_faces, nb_faces) :: S, K
 
+  integer :: i
+
   tabulated_r(:) = default_r_spacing(tabulation_nr)
   tabulated_z(:) = default_z_spacing(tabulation_nz)
   tabulated_integrals(:, :, :, :) = construct_tabulation(tabulated_r, tabulated_z, 251)
 
-  wavenumber = 1.0
   depth = ieee_value(depth, ieee_positive_inf)
 
   vertices = reshape([  &
@@ -76,6 +77,27 @@ program test
   quadrature_points = reshape(face_center, shape(quadrature_points))
   quadrature_weights = reshape(face_area, shape(quadrature_weights))
 
+  print*, "Rankine part"
+  call build_matrices(                                           &
+    nb_faces, face_center, face_normal,                          &
+    nb_vertices, nb_faces, vertices, faces,                      &
+    face_center, face_normal, face_area, face_radius,            &
+    nb_quadrature_points, quadrature_points, quadrature_weights, &
+    0d0, depth,                                                  &
+    [1d0, 0d0, 0d0],                                             &
+    tabulated_r, tabulated_z, tabulated_integrals,               &
+    nexp, ambda, ar,                                             &
+    .true.,                                                      &
+    S, K)
+  do i = 1, nb_faces
+    print*, S(i, :)
+  enddo
+  do i = 1, nb_faces
+    print*, K(i, :)
+  enddo
+
+  print*, "k = 1.0"
+  wavenumber = 1.0
   call build_matrices(                                           &
     nb_faces, face_center, face_normal,                          &
     nb_vertices, nb_faces, vertices, faces,                      &
@@ -87,8 +109,31 @@ program test
     nexp, ambda, ar,                                             &
     .true.,                                                      &
     S, K)
+  do i = 1, nb_faces
+    print*, S(i, :)
+  enddo
+  do i = 1, nb_faces
+    print*, K(i, :)
+  enddo
 
-  print*, S
-  print*, K
+  print*, "k = 2.0"
+  wavenumber = 2d0
+  call build_matrices(                                           &
+    nb_faces, face_center, face_normal,                          &
+    nb_vertices, nb_faces, vertices, faces,                      &
+    face_center, face_normal, face_area, face_radius,            &
+    nb_quadrature_points, quadrature_points, quadrature_weights, &
+    wavenumber, depth,                                           &
+    [1d0, -1d0, 1d0],                                            &
+    tabulated_r, tabulated_z, tabulated_integrals,               &
+    nexp, ambda, ar,                                             &
+    .true.,                                                      &
+    S, K)
+  do i = 1, nb_faces
+    print*, S(i, :)
+  enddo
+  do i = 1, nb_faces
+    print*, K(i, :)
+  enddo
 
 end program test

@@ -42,6 +42,7 @@ BENCHMARKS_BIN=$(BENCHMARKS_SRC:.f90=.bin)
 
 run :$(EXAMPLES_BIN)
 	examples/minimal/minimal_example.bin
+	python examples/minimal/same_in_Capytaine.py
 	# benchmarks/tabulations/benchmark_tabulation.bin
 
 # BENCHMARK_RESULTS_DIR = results/$(shell git rev-parse HEAD)
