@@ -66,13 +66,12 @@ quadrature_weights = reshape(face_area, shape(quadrature_weights))
 call system_clock(count_rate=clock_rate)
 
 open(unit=210, file="benchmark_results.csv")
-write(210, *) "n_threads, elapsed_time"
+write(210, *) "n_threads, elapsed_time, kind"
 
 do n_threads = 1, 6
   call omp_set_num_threads(n_threads)
 
   call system_clock(starting_time)
-
   call build_matrices(                                           &
     nb_faces, face_center, face_normal,                          &
     nb_vertices, nb_faces, vertices, faces,                      &
@@ -82,13 +81,46 @@ do n_threads = 1, 6
     [1d0, -1d0, 1d0],                                            &
     tabulated_r, tabulated_z, tabulated_integrals,               &
     nexp, ambda, ar,                                             &
-    .true.,                                                      &
+    .false.,                                                     &
     S, K)
-
   call system_clock(final_time)
 
   print*, n_threads, "threads. Elapsed time:", real(final_time - starting_time)/clock_rate
-  write(210, *) n_threads, ",", real(final_time - starting_time)/clock_rate
+  write(210, *) n_threads, ",", real(final_time - starting_time)/clock_rate, ", ", "full"
+
+  call system_clock(starting_time)
+  call build_matrices(                                           &
+    nb_faces, face_center, face_normal,                          &
+    nb_vertices, nb_faces, vertices, faces,                      &
+    face_center, face_normal, face_area, face_radius,            &
+    nb_quadrature_points, quadrature_points, quadrature_weights, &
+    wavenumber, depth,                                           &
+    [0d0, 0d0, 1d0],                                            &
+    tabulated_r, tabulated_z, tabulated_integrals,               &
+    nexp, ambda, ar,                                             &
+    .false.,                                                     &
+    S, K)
+  call system_clock(final_time)
+
+  print*, n_threads, "threads. Elapsed time:", real(final_time - starting_time)/clock_rate
+  write(210, *) n_threads, ",", real(final_time - starting_time)/clock_rate, ", ", "wave_only"
+
+  call system_clock(starting_time)
+  call build_matrices(                                           &
+    nb_faces, face_center, face_normal,                          &
+    nb_vertices, nb_faces, vertices, faces,                      &
+    face_center, face_normal, face_area, face_radius,            &
+    nb_quadrature_points, quadrature_points, quadrature_weights, &
+    wavenumber, depth,                                           &
+    [0d0, 0d0, 1d0],                                            &
+    tabulated_r, tabulated_z, tabulated_integrals,               &
+    nexp, ambda, ar,                                             &
+    .true.,                                                     &
+    S, K)
+  call system_clock(final_time)
+
+  print*, n_threads, "threads. Elapsed time:", real(final_time - starting_time)/clock_rate
+  write(210, *) n_threads, ",", real(final_time - starting_time)/clock_rate, ", ","half_wave_only"
 enddo
 
 contains

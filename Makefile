@@ -44,15 +44,16 @@ run :$(EXAMPLES_BIN)
 	examples/minimal/minimal_example.bin
 	# benchmarks/tabulations/benchmark_tabulation.bin
 
-BENCHMARK_RESULTS_DIR = results/$(shell git rev-parse HEAD)
+# BENCHMARK_RESULTS_DIR = results/$(shell git rev-parse HEAD)
+BENCHMARK_RESULTS_DIR = results/$(shell git branch --show-current)
 BENCHMARK_RESULT      = $(BENCHMARK_RESULTS_DIR)/omp.csv
 $(BENCHMARK_RESULT): $(BENCHMARKS_BIN)
 	benchmarks/openmp/benchmark_omp.bin
 	mkdir -p $(BENCHMARK_RESULTS_DIR)
 	mv benchmark_results.csv $(BENCHMARK_RESULT)
-	benchmarks/openmp/read_output.py
 
 benchmark: $(BENCHMARK_RESULT)
+	python benchmarks/openmp/read_output.py
 
 clean:
 	rm -rf $(OBJ) $(LIBDIR) $(EXAMPLES_BIN) $(BENCHMARKS_BIN)
