@@ -47,7 +47,7 @@ CONTAINS
 
     REAL(KIND=PRE),                           INTENT(IN) :: wavenumber, depth
 
-    REAL(KIND=PRE), DIMENSION(3) :: coeffs
+    REAL(KIND=PRE), DIMENSION(3)                         :: coeffs
 
     ! Tabulated data
     REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_r_range
@@ -69,18 +69,19 @@ CONTAINS
     REAL(KIND=PRE), DIMENSION(3)    :: VSP1
     COMPLEX(KIND=PRE)               :: SP2
     COMPLEX(KIND=PRE), DIMENSION(3) :: VSP2_SYM, VSP2_ANTISYM
+    LOGICAL :: use_symmetry_of_wave_part
 
+    use_symmetry_of_wave_part = ((SAME_BODY) .AND. (nb_quad_points == 1))
 
-    !!!!!!!!!!!!!!!!!!!!
-    !  Initialization  !
-    !!!!!!!!!!!!!!!!!!!!
     !$OMP PARALLEL DO SCHEDULE(DYNAMIC) &
     !$OMP&  PRIVATE(J, I, SP1, VSP1, SP2, VSP2_SYM, VSP2_ANTISYM, reflected_centers_1_I, reflected_normals_1_I)
     DO J = 1, nb_faces_2
 
+      !!!!!!!!!!!!!!!!!!!!
+      !  Initialization  !
+      !!!!!!!!!!!!!!!!!!!!
       S(:, J) = CMPLX(0.0, 0.0, KIND=PRE)
       K(:, J) = CMPLX(0.0, 0.0, KIND=PRE)
-
 
       !!!!!!!!!!!!!!!!!!
       !  Rankine part  !
@@ -146,93 +147,89 @@ CONTAINS
       !  Wave part  !
       !!!!!!!!!!!!!!!
 
-      IF (coeffs(3) .NE. ZERO) THEN
-        IF ((SAME_BODY) .AND. (nb_quad_points == 1)) THEN
-          ! If we are computing the influence of some cells upon themselves, the resulting matrices have some symmetries.
-          ! This is due to the symmetry of the Green function, and the way the integral on the face is approximated.
-          ! (More precisely, the Green function is symmetric and its derivative is the sum of a symmetric part and an anti-symmetric
-          ! part.)
+      IF ((coeffs(3) .NE. ZERO) .AND. (.NOT. use_symmetry_of_wave_part)) THEN
+        DO I = 1, nb_faces_1
+          DO Q = 1, nb_quad_points
+            IF (is_infinity(depth)) THEN
+              CALL WAVE_PART_INFINITE_DEPTH &
+                (centers_1(I, :),           &
+                quad_points(J, Q, :),       & ! centers_2(J, :),
+                wavenumber,                 &
+                tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+                SP2, VSP2_SYM               &
+                )
+              VSP2_ANTISYM(:) = ZERO
+            ELSE
+              CALL WAVE_PART_FINITE_DEPTH   &
+                (centers_1(I, :),           &
+                quad_points(J, Q, :),       & ! centers_2(J, :),
+                wavenumber,                 &
+                depth,                      &
+                tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+                NEXP, AMBDA, AR,            &
+                SP2, VSP2_SYM, VSP2_ANTISYM &
+                )
+            END IF
 
-          DO I = J, nb_faces_1
-              IF (is_infinity(depth)) THEN
-                CALL WAVE_PART_INFINITE_DEPTH &
-                  (centers_1(I, :),           &
-                  quad_points(J, 1, :),       & ! centers_2(J, :),
-                  wavenumber,                 &
-                  tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-                  SP2, VSP2_SYM               &
-                  )
-                VSP2_ANTISYM(:) = ZERO
-              ELSE
-                CALL WAVE_PART_FINITE_DEPTH   &
-                  (centers_1(I, :),           &
-                  quad_points(J, 1, :),       & ! centers_2(J, :),
-                  wavenumber,                 &
-                  depth,                      &
-                  tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-                  NEXP, AMBDA, AR,            &
-                  SP2, VSP2_SYM, VSP2_ANTISYM &
-                  )
-              END IF
+            S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, Q)
+            K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
+              DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, Q)
 
-              S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, 1)
-              K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
-                DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, 1)
-
-              IF (.NOT. I==J) THEN
-                VSP2_SYM(1:2) = -VSP2_SYM(1:2)
-                S(J, I) = S(J, I) - coeffs(3)/(4*PI) * SP2 * quad_weights(I, 1)
-                K(J, I) = K(J, I) - coeffs(3)/(4*PI) * &
-                  DOT_PRODUCT(normals_1(J, :), VSP2_SYM - VSP2_ANTISYM) * quad_weights(I, 1)
-              END IF
           END DO
-
-        ELSE
-          ! General case: if we are computing the influence of a some cells on other cells, we have to compute all the coefficients.
-
-          DO I = 1, nb_faces_1
-            DO Q = 1, nb_quad_points
-              IF (is_infinity(depth)) THEN
-                CALL WAVE_PART_INFINITE_DEPTH &
-                  (centers_1(I, :),           &
-                  quad_points(J, Q, :),       & ! centers_2(J, :),
-                  wavenumber,                 &
-                  tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-                  SP2, VSP2_SYM               &
-                  )
-                VSP2_ANTISYM(:) = ZERO
-              ELSE
-                CALL WAVE_PART_FINITE_DEPTH   &
-                  (centers_1(I, :),           &
-                  quad_points(J, Q, :),       & ! centers_2(J, :),
-                  wavenumber,                 &
-                  depth,                      &
-                  tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-                  NEXP, AMBDA, AR,            &
-                  SP2, VSP2_SYM, VSP2_ANTISYM &
-                  )
-              END IF
-
-              S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, Q)
-              K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
-                DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, Q)
-
-            END DO
-          END DO
-        END IF
+        END DO
       END IF
-
-      !!!!!!!!!!!!!
 
       IF (SAME_BODY) THEN
-          K(J, J) = K(J, J) + 0.5
+        K(J, J) = K(J, J) + 0.5
       END IF
-    END DO
 
-    RETURN
+    END DO  ! parallelized loop on J
+
+
+    IF ((coeffs(3) .NE. ZERO) .AND. use_symmetry_of_wave_part) THEN
+      ! If we are computing the influence of some cells upon themselves, the resulting matrices have some symmetries.
+      ! This is due to the symmetry of the Green function, and the way the integral on the face is approximated.
+      ! (More precisely, the Green function is symmetric and its derivative is the sum of a symmetric part and an anti-symmetric
+      ! part.)
+
+      !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(J, I, SP2, VSP2_SYM, VSP2_ANTISYM)
+      DO J = 1, nb_faces_2
+        DO I = J, nb_faces_1
+          IF (is_infinity(depth)) THEN
+            CALL WAVE_PART_INFINITE_DEPTH &
+              (centers_1(I, :),           &
+              quad_points(J, 1, :),       & ! centers_2(J, :),
+              wavenumber,                 &
+              tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+              SP2, VSP2_SYM               &
+              )
+            VSP2_ANTISYM(:) = ZERO
+          ELSE
+            CALL WAVE_PART_FINITE_DEPTH   &
+              (centers_1(I, :),           &
+              quad_points(J, 1, :),       & ! centers_2(J, :),
+              wavenumber,                 &
+              depth,                      &
+              tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+              NEXP, AMBDA, AR,            &
+              SP2, VSP2_SYM, VSP2_ANTISYM &
+              )
+          END IF
+
+          S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, 1)
+          K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
+            DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, 1)
+
+          IF (.NOT. I==J) THEN
+            VSP2_SYM(1:2) = -VSP2_SYM(1:2)
+            S(J, I) = S(J, I) - coeffs(3)/(4*PI) * SP2 * quad_weights(I, 1)
+            K(J, I) = K(J, I) - coeffs(3)/(4*PI) * &
+              DOT_PRODUCT(normals_1(J, :), VSP2_SYM - VSP2_ANTISYM) * quad_weights(I, 1)
+          END IF
+        END DO
+      END DO
+    END IF
 
   END SUBROUTINE
-
-  ! =====================================================================
 
 END MODULE MATRICES
