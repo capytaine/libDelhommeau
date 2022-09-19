@@ -277,6 +277,15 @@ CONTAINS
     !  Reflected Rankine part  !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+#ifndef XIE_CORRECTION
+    IF (is_infinity(depth)) THEN
+      ! In infinite depth, for finite frequency,
+      ! the original Delhommeau's method as in Nemoh uses coeffs(2) = -1.
+      ! But by default, coeffs(2) is set to 1 in delhommeau.py.
+      coeffs(2) = coeffs(2) - 2*coeffs(3)
+    ENDIF
+#endif
+
     IF (coeffs(2) .NE. ZERO) THEN
 
       IF (is_infinity(depth)) THEN

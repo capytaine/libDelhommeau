@@ -39,6 +39,7 @@ program test
   complex(kind=pre), dimension(nb_faces, nb_faces) :: S, K
 
   integer :: i
+  real(kind=pre), dimension(3) :: coeffs
 
   tabulated_r(:) = default_r_spacing(tabulation_nr)
   tabulated_z(:) = default_z_spacing(tabulation_nz)
@@ -77,14 +78,15 @@ program test
   quadrature_points = reshape(face_center, shape(quadrature_points))
   quadrature_weights = reshape(face_area, shape(quadrature_weights))
 
+
   print*, "Rankine part"
+  coeffs = [1d0, 0d0, 0d0]
   call build_matrices(                                           &
     nb_faces, face_center, face_normal,                          &
     nb_vertices, nb_faces, vertices, faces,                      &
     face_center, face_normal, face_area, face_radius,            &
     nb_quadrature_points, quadrature_points, quadrature_weights, &
-    0d0, depth,                                                  &
-    [1d0, 0d0, 0d0],                                             &
+    0d0, depth, coeffs,                                          &
     tabulated_r, tabulated_z, tabulated_integrals,               &
     nexp, ambda, ar,                                             &
     .true.,                                                      &
@@ -98,13 +100,13 @@ program test
 
   print*, "k = 1.0"
   wavenumber = 1.0
+  coeffs = [1d0, 1d0, 1d0]
   call build_matrices(                                           &
     nb_faces, face_center, face_normal,                          &
     nb_vertices, nb_faces, vertices, faces,                      &
     face_center, face_normal, face_area, face_radius,            &
     nb_quadrature_points, quadrature_points, quadrature_weights, &
-    wavenumber, depth,                                           &
-    [1d0, -1d0, 1d0],                                            &
+    wavenumber, depth, coeffs,                                   &
     tabulated_r, tabulated_z, tabulated_integrals,               &
     nexp, ambda, ar,                                             &
     .true.,                                                      &
@@ -118,13 +120,13 @@ program test
 
   print*, "k = 2.0"
   wavenumber = 2d0
+  coeffs = [1d0, 1d0, 1d0]
   call build_matrices(                                           &
     nb_faces, face_center, face_normal,                          &
     nb_vertices, nb_faces, vertices, faces,                      &
     face_center, face_normal, face_area, face_radius,            &
     nb_quadrature_points, quadrature_points, quadrature_weights, &
-    wavenumber, depth,                                           &
-    [1d0, -1d0, 1d0],                                            &
+    wavenumber, depth, coeffs,                                   &
     tabulated_r, tabulated_z, tabulated_integrals,               &
     nexp, ambda, ar,                                             &
     .true.,                                                      &

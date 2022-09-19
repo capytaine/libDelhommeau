@@ -78,7 +78,7 @@ do n_threads = 1, 6
     face_center, face_normal, face_area, face_radius,            &
     nb_quadrature_points, quadrature_points, quadrature_weights, &
     wavenumber, depth,                                           &
-    [1d0, -1d0, 1d0],                                            &
+    [1d0, 1d0, 1d0],                                            &
     tabulated_r, tabulated_z, tabulated_integrals,               &
     nexp, ambda, ar,                                             &
     .false.,                                                     &
