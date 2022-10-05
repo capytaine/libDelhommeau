@@ -2,6 +2,7 @@
 ! See LICENSE file at <https://github.com/mancellin/libDelhommeau>
 MODULE Old_Prony_decomposition
 
+  USE FLOATING_POINT_PRECISION, ONLY: PRE
   USE CONSTANTS
 
   IMPLICIT NONE

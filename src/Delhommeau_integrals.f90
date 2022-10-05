@@ -16,6 +16,7 @@
 !
 module delhommeau_integrals
 
+  use floating_point_precision, only: pre
   use constants
 
   implicit none
