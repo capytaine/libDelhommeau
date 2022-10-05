@@ -45,12 +45,21 @@ CONTAINS
     COMPLEX(KIND=PRE), DIMENSION(3),          INTENT(OUT) :: VS  ! its gradient
 
     ! Local variables
-    REAL(KIND=PRE) :: r, z, r1
+    REAL(KIND=PRE) :: r, z, r1, drdx, drdy
     REAL(KIND=PRE), dimension(2, 2) :: integrals
 
     r = wavenumber * NORM2(X0I(1:2) - X0J(1:2))
     z = wavenumber * (X0I(3) + X0J(3))
     r1 = hypot(r, z)
+
+    IF (ABS(r) > 16*EPSILON(r)) THEN
+      drdx = wavenumber * (X0I(1) - X0J(1))/r
+      drdy = wavenumber * (X0I(2) - X0J(2))/r
+    ELSE
+      ! Limit when r->0 is not well defined...
+      drdx = ZERO
+      drdy = ZERO
+    END IF
 
     IF (z > -1e-8) THEN
       PRINT*, "Error: Impossible to compute the wave part of the Green function due to panels on the free surface (z=0) or above."
@@ -64,32 +73,26 @@ CONTAINS
     integrals = numerical_integration(r, z, 251)
 #else
     IF ((MINVAL(tabulated_z_range) < z) .AND. (r < MAXVAL(tabulated_r_range))) THEN
-        ! Within the range of tabulated data
-        integrals = pick_in_default_tabulation(r, z, tabulated_r_range, tabulated_z_range, tabulated_integrals)
-
-      ELSE
-        ! Asymptotic expression for distant panels
-        integrals = asymptotic_approximations(MAX(r, 1e-10), z)
-      ENDIF
+      ! Within the range of tabulated data
+      integrals = pick_in_default_tabulation(r, z, tabulated_r_range, tabulated_z_range, tabulated_integrals)
+    ELSE
+      ! Asymptotic expression for distant panels
+      integrals = asymptotic_approximations(MAX(r, 1e-10), z)
+    ENDIF
 #endif
 
-      !================================================
-      ! Add the elementary integrals to build FS and VS
-      !================================================
+    !================================================
+    ! Add the elementary integrals to build FS and VS
+    !================================================
 
-      FS    = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
-      VS(1) = -CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE) * wavenumber * (X0I(1) - X0J(1))/r
-      VS(2) = -CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE) * wavenumber * (X0I(2) - X0J(2))/r
+    FS    = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
+    VS(1) = -drdx * CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE)
+    VS(2) = -drdy * CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE)
 #ifdef XIE_CORRECTION
-      VS(3) = CMPLX(integrals(1, 2)/PI + ONE/r1, integrals(2, 2), KIND=PRE)
+    VS(3) = CMPLX(integrals(1, 2)/PI + ONE/r1, integrals(2, 2), KIND=PRE)
 #else
-      VS(3) = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
+    VS(3) = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
 #endif
-
-      IF (r < REAL(1e-5, KIND=PRE)) THEN
-        ! Limit case r ~ 0 ?
-        VS(1:2) = CMPLX(0.0, 0.0, KIND=PRE)
-      END IF
 
     RETURN
   END SUBROUTINE COLLECT_DELHOMMEAU_INTEGRALS
