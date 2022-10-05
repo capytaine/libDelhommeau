@@ -69,9 +69,6 @@ CONTAINS
     !=======================================================
     ! Evaluate the elementary integrals depending on z and r
     !=======================================================
-#ifdef NO_TABULATION
-    integrals = numerical_integration(r, z, 251)
-#else
     IF ((MINVAL(tabulated_z_range) < z) .AND. (r < MAXVAL(tabulated_r_range))) THEN
       ! Within the range of tabulated data
       integrals = pick_in_default_tabulation(r, z, tabulated_r_range, tabulated_z_range, tabulated_integrals)
@@ -79,7 +76,6 @@ CONTAINS
       ! Asymptotic expression for distant panels
       integrals = asymptotic_approximations(MAX(r, 1e-10), z)
     ENDIF
-#endif
 
     !================================================
     ! Add the elementary integrals to build FS and VS
