@@ -68,13 +68,19 @@ CONTAINS
     !=======================================================
     ! Evaluate the elementary integrals depending on z and r
     !=======================================================
-    IF ((MINVAL(tabulated_z_range) < z) .AND. (r < MAXVAL(tabulated_r_range))) THEN
-      ! Within the range of tabulated data
-      integrals = pick_in_default_tabulation(r, z, tabulated_r_range, tabulated_z_range, tabulated_integrals)
+    IF ((size(tabulated_z_range) <= 1) .or. (size(tabulated_r_range) <= 1)) THEN
+      ! No tabulation, fully recompute the Green function each time.
+      integrals = numerical_integration(r, z, 500)
 
     ELSE
-      ! Asymptotic expression for distant panels
-      integrals = asymptotic_approximations(MAX(r, 1e-10), z)
+      IF ((MINVAL(tabulated_z_range) < z) .AND. (r < MAXVAL(tabulated_r_range))) THEN
+        ! Within the range of tabulated data
+        integrals = pick_in_default_tabulation(r, z, tabulated_r_range, tabulated_z_range, tabulated_integrals)
+
+      ELSE
+        ! Asymptotic expression for distant panels
+        integrals = asymptotic_approximations(MAX(r, 1e-10), z)
+      ENDIF
     ENDIF
 
     !================================================
