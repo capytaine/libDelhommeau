@@ -2,6 +2,7 @@ MODULE MATRICES
 
   USE ieee_arithmetic
   USE CONSTANTS
+  use face_type_module
 
   USE GREEN_RANKINE
   USE GREEN_WAVE
@@ -63,15 +64,14 @@ CONTAINS
     COMPLEX(KIND=PRE), DIMENSION(nb_faces_1, nb_faces_2), INTENT(OUT) :: K
 
     ! Local variables
-    INTEGER                         :: I, J, Q
-    REAL(KIND=PRE), DIMENSION(3)    :: reflected_centers_1_I, reflected_normals_1_I
-    REAL(KIND=PRE)                  :: SP1
-    REAL(KIND=PRE), DIMENSION(3)    :: VSP1
-    COMPLEX(KIND=PRE)               :: SP2
-    COMPLEX(KIND=PRE), DIMENSION(3) :: VSP2_SYM, VSP2_ANTISYM
+    integer                         :: i, j
+    type(face_type)                 :: face_j
+    real(kind=pre), dimension(3)    :: reflected_centers_1_i, reflected_normals_1_i
+    real(kind=pre)                  :: g, dgdn
+    complex(kind=pre)               :: g_, dgdn_sym, dgdn_antisym
     LOGICAL :: use_symmetry_of_wave_part
 
-    use_symmetry_of_wave_part = ((SAME_BODY) .AND. (nb_quad_points == 1))
+    use_symmetry_of_wave_part = .false. !((SAME_BODY) .AND. (nb_quad_points == 1))
 
 
 #ifndef XIE_CORRECTION
@@ -83,9 +83,10 @@ CONTAINS
     ENDIF
 #endif
 
+    coeffs = -coeffs/(4*PI)
 
     !$OMP PARALLEL DO SCHEDULE(DYNAMIC) &
-    !$OMP&  PRIVATE(J, I, SP1, VSP1, SP2, VSP2_SYM, VSP2_ANTISYM, reflected_centers_1_I, reflected_normals_1_I)
+    !$OMP&  PRIVATE(J, I, g, dgdn, g_, dgdn_sym, dgdn_antisym, reflected_centers_1_I, reflected_normals_1_I)
     DO J = 1, nb_faces_2
 
       !!!!!!!!!!!!!!!!!!!!
@@ -94,29 +95,24 @@ CONTAINS
       S(:, J) = CMPLX(0.0, 0.0, KIND=PRE)
       K(:, J) = CMPLX(0.0, 0.0, KIND=PRE)
 
+      face_j%vertices = vertices_2(faces_2(J, :), :)
+      face_j%center   = centers_2(J, :)
+      face_j%normal   = normals_2(J, :)
+      face_j%area     = areas_2(J)
+      face_j%radius   = radiuses_2(J)
+      face_j%quad_points = quad_points(J, :, :)
+      face_j%quad_weights = quad_weights(J, :)
+
       !!!!!!!!!!!!!!!!!!
       !  Rankine part  !
       !!!!!!!!!!!!!!!!!!
       IF (coeffs(1) .NE. ZERO) THEN
         DO I = 1, nb_faces_1
-
-          CALL COMPUTE_INTEGRAL_OF_RANKINE_SOURCE( &
-            centers_1(I, :),                       &
-            vertices_2(faces_2(J, :), :),          &
-            centers_2(J, :),                       &
-            normals_2(J, :),                       &
-            areas_2(J),                            &
-            radiuses_2(J),                         &
-            SP1, VSP1                              &
-            )
-
-          ! Store into influence matrix
-          S(I, J) = S(I, J) - coeffs(1) * SP1/(4*PI)                                ! Green function
-          K(I, J) = K(I, J) - coeffs(1) * DOT_PRODUCT(normals_1(I, :), VSP1)/(4*PI) ! Gradient of the Green function
-
+          call integral_of_rankine_source(centers_1(I, :), face_j, normals_1(I, :), g, dgdn)
+          S(I, J) = S(I, J) + coeffs(1) * g
+          K(I, J) = K(I, J) + coeffs(1) * dgdn
         END DO
       END IF
-
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !  Reflected Rankine part  !
@@ -124,7 +120,6 @@ CONTAINS
 
       IF (coeffs(2) .NE. ZERO) THEN
         DO I = 1, nb_faces_1
-
           IF (is_infinity(depth)) THEN
             ! Reflection through free surface
             reflected_centers_1_I(1:2) = centers_1(I, 1:2)
@@ -138,19 +133,11 @@ CONTAINS
           reflected_normals_1_I(1:2) = normals_1(I, 1:2)
           reflected_normals_1_I(3)   = -normals_1(I, 3)
 
-          CALL COMPUTE_INTEGRAL_OF_RANKINE_SOURCE( &
-            reflected_centers_1_I(:),                &
-            vertices_2(faces_2(J, :), :),          &
-            centers_2(J, :),                       &
-            normals_2(J, :),                       &
-            areas_2(J),                            &
-            radiuses_2(J),                         &
-            SP1, VSP1                              &
-            )
+          call integral_of_rankine_source &
+            (reflected_centers_1_I(:), face_j, reflected_normals_1_I(:), g, dgdn)
 
-          ! Store into influence matrix
-          S(I, J) = S(I, J) - coeffs(2) * SP1/(4*PI)                                ! Green function
-          K(I, J) = K(I, J) - coeffs(2) * DOT_PRODUCT(reflected_normals_1_I(:), VSP1)/(4*PI) ! Gradient of the Green function
+          S(I, J) = S(I, J) + coeffs(2) * g
+          K(I, J) = K(I, J) + coeffs(2) * dgdn
         END DO
       END IF
 
@@ -160,33 +147,15 @@ CONTAINS
 
       IF ((coeffs(3) .NE. ZERO) .AND. (.NOT. use_symmetry_of_wave_part)) THEN
         DO I = 1, nb_faces_1
-          DO Q = 1, nb_quad_points
-            IF (is_infinity(depth)) THEN
-              CALL WAVE_PART_INFINITE_DEPTH &
-                (centers_1(I, :),           &
-                quad_points(J, Q, :),       & ! centers_2(J, :),
-                wavenumber,                 &
-                tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-                SP2, VSP2_SYM               &
-                )
-              VSP2_ANTISYM(:) = ZERO
-            ELSE
-              CALL WAVE_PART_FINITE_DEPTH   &
-                (centers_1(I, :),           &
-                quad_points(J, Q, :),       & ! centers_2(J, :),
-                wavenumber,                 &
-                depth,                      &
-                tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-                NEXP, AMBDA, AR,            &
-                SP2, VSP2_SYM, VSP2_ANTISYM &
-                )
-            END IF
 
-            S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, Q)
-            K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
-              DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, Q)
+          call integral_of_wave_part &
+            (centers_1(I, :), face_j, normals_1(I, :), wavenumber, depth, &
+            tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+            NEXP, AMBDA, AR, &
+            g_, dgdn_sym, dgdn_antisym)
 
-          END DO
+          S(I, J) = S(I, J) + coeffs(3) * g_
+          K(I, J) = K(I, J) + coeffs(3) * (dgdn_sym + dgdn_antisym)
         END DO
       END IF
 
@@ -203,39 +172,22 @@ CONTAINS
       ! (More precisely, the Green function is symmetric and its derivative is the sum of a symmetric part and an anti-symmetric
       ! part.)
 
-      !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(J, I, SP2, VSP2_SYM, VSP2_ANTISYM)
+      !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(J, I, g_, dgdn_sym, dgdn_antisym)
       DO J = 1, nb_faces_2
         DO I = J, nb_faces_1
-          IF (is_infinity(depth)) THEN
-            CALL WAVE_PART_INFINITE_DEPTH &
-              (centers_1(I, :),           &
-              quad_points(J, 1, :),       & ! centers_2(J, :),
-              wavenumber,                 &
-              tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-              SP2, VSP2_SYM               &
-              )
-            VSP2_ANTISYM(:) = ZERO
-          ELSE
-            CALL WAVE_PART_FINITE_DEPTH   &
-              (centers_1(I, :),           &
-              quad_points(J, 1, :),       & ! centers_2(J, :),
-              wavenumber,                 &
-              depth,                      &
-              tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-              NEXP, AMBDA, AR,            &
-              SP2, VSP2_SYM, VSP2_ANTISYM &
-              )
-          END IF
+          call integral_of_wave_part &
+            (centers_1(I, :), face_j, normals_1(I, :), wavenumber, depth, &
+            tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+            NEXP, AMBDA, AR, &
+            g_, dgdn_sym, dgdn_antisym)
 
-          S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, 1)
-          K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
-            DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, 1)
+          S(I, J) = S(I, J) + coeffs(3) * g_
+          K(I, J) = K(I, J) + coeffs(3) * (dgdn_sym + dgdn_antisym)
 
           IF (.NOT. I==J) THEN
-            VSP2_SYM(1:2) = -VSP2_SYM(1:2)
-            S(J, I) = S(J, I) - coeffs(3)/(4*PI) * SP2 * quad_weights(I, 1)
-            K(J, I) = K(J, I) - coeffs(3)/(4*PI) * &
-              DOT_PRODUCT(normals_1(J, :), VSP2_SYM - VSP2_ANTISYM) * quad_weights(I, 1)
+            ! VSP2_SYM(1:2) = -VSP2_SYM(1:2)
+            S(I, J) = S(I, J) + coeffs(3) * g_
+            K(I, J) = K(I, J) + coeffs(3) * (dgdn_sym - dgdn_antisym)
           END IF
         END DO
       END DO

@@ -2,168 +2,137 @@
 ! See LICENSE file at <https://github.com/mancellin/libDelhommeau>
 MODULE GREEN_WAVE
 
+  USE ieee_arithmetic
   USE CONSTANTS
+  USE FACE_TYPE_MODULE
   USE DELHOMMEAU_INTEGRALS
-  USE GREEN_RANKINE, ONLY: COMPUTE_ASYMPTOTIC_RANKINE_SOURCE
 
   IMPLICIT NONE
 
-  ! Dependencies between the functions of this module:
-  ! (from top to bottom: "is called by")
-  !
-  !               (Delhommeau_integrals.f90)
-  !                          |
-  !              COLLECT_DELHOMMEAU_INTEGRALS       (COMPUTE_ASYMPTOTIC_RANKINE_SOURCE)
-  !                        /   \                    /
-  ! WAVE_PART_INFINITE_DEPTH   WAVE_PART_FINITE_DEPTH
-  !                        \   /
-  !                    (matrices.f90)
-  !                          |
-  !                    (python code)
-
 CONTAINS
+
+  subroutine integral_of_wave_part &
+      (x, face, n, k, depth, &
+      tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+      nexp, ambda, ar, &
+      g, dgdn_sym, dgdn_antisym)
+
+    real(kind=pre), dimension(3), intent(in)  :: x, n
+    type(face_type),              intent(in)  :: face
+    real(kind=pre),               intent(in)  :: k, depth
+    complex(kind=pre),            intent(out) :: g, dgdn_sym, dgdn_antisym
+
+    real(kind=pre), dimension(:),          intent(in) :: tabulated_r_range
+    real(kind=pre), dimension(:),          intent(in) :: tabulated_z_range
+    real(kind=pre), dimension(:, :, :, :), intent(in) :: tabulated_integrals
+
+    integer,                          intent(in) :: nexp
+    real(kind=pre), dimension(nexp),  intent(in) :: ambda, ar
+
+    integer :: q
+    complex(kind=pre) :: g_q, dgdn_sym_q, dgdn_antisym_q
+
+    g = zero
+    dgdn_sym = zero
+    dgdn_antisym = zero
+
+    do q = 1, size(face%quad_points, 1)
+
+      if (is_infinity(depth)) then
+        call wave_part_infinite_depth &
+          (x, face%quad_points(q, :), n, k, &
+          tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+          g_q, dgdn_sym_q, dgdn_antisym_q)
+      else
+        call wave_part_finite_depth &
+          (x, face%quad_points(q, :), n, k, depth, &
+          tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+          NEXP, AMBDA, AR, &
+          g_q, dgdn_sym_q, dgdn_antisym_q)
+      endif
+
+      g = g + g_q * face%quad_weights(q)
+      dgdn_sym = dgdn_sym + dgdn_sym_q * face%quad_weights(q)
+      dgdn_antisym = dgdn_antisym + dgdn_antisym_q * face%quad_weights(q)
+    end do
+
+  contains
+
+    pure logical function is_infinity(x)
+      real(kind=pre), intent(in) :: x
+      is_infinity = (.not. ieee_is_finite(x))
+    end function
+  end subroutine
 
   ! =====================================================================
 
-  SUBROUTINE COLLECT_DELHOMMEAU_INTEGRALS                        &
-      (X0I, X0J, wavenumber,                                     &
-      tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-      FS, VS)
-
-    ! Inputs
-    REAL(KIND=PRE), DIMENSION(3),             INTENT(IN) :: X0I, X0J
-    REAL(KIND=PRE),                           INTENT(IN) :: wavenumber
-
-    ! Tabulated data
-    REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_r_range
-    REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_z_range
-    REAL(KIND=PRE), DIMENSION(size(tabulated_r_range), size(tabulated_z_range), 2, 2), INTENT(IN) :: tabulated_integrals
-
-    ! Outputs
-    COMPLEX(KIND=PRE),                        INTENT(OUT) :: FS  ! the integral
-    COMPLEX(KIND=PRE), DIMENSION(3),          INTENT(OUT) :: VS  ! its gradient
-
-    ! Local variables
-    REAL(KIND=PRE) :: r, z, r1, drdx, drdy
-    REAL(KIND=PRE), dimension(2, 2) :: integrals
-
-    r = wavenumber * NORM2(X0I(1:2) - X0J(1:2))
-    z = wavenumber * (X0I(3) + X0J(3))
-    r1 = hypot(r, z)
-
-    IF (ABS(r) > 16*EPSILON(r)) THEN
-      drdx = wavenumber * (X0I(1) - X0J(1))/r
-      drdy = wavenumber * (X0I(2) - X0J(2))/r
-    ELSE
-      ! Limit when r->0 is not well defined...
-      drdx = ZERO
-      drdy = ZERO
-    END IF
-
-    IF (z > -1e-8) THEN
-      PRINT*, "Error: Impossible to compute the wave part of the Green function due to panels on the free surface (z=0) or above."
-      ERROR STOP
-    ENDIF
-
-    !=======================================================
-    ! Evaluate the elementary integrals depending on z and r
-    !=======================================================
-    IF ((MINVAL(tabulated_z_range) < z) .AND. (r < MAXVAL(tabulated_r_range))) THEN
-      ! Within the range of tabulated data
-      integrals = pick_in_default_tabulation(r, z, tabulated_r_range, tabulated_z_range, tabulated_integrals)
-
-    ELSE
-      ! Asymptotic expression for distant panels
-      integrals = asymptotic_approximations(MAX(r, 1e-10), z)
-    ENDIF
-
-    !================================================
-    ! Add the elementary integrals to build FS and VS
-    !================================================
-
-    FS    = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
-    VS(1) = -drdx * CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE)
-    VS(2) = -drdy * CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE)
-#ifdef XIE_CORRECTION
-    VS(3) = CMPLX(integrals(1, 2)/PI + ONE/r1, integrals(2, 2), KIND=PRE)
-#else
-    VS(3) = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
-#endif
-
-    RETURN
-  END SUBROUTINE COLLECT_DELHOMMEAU_INTEGRALS
-
-  ! =========================
-
   SUBROUTINE WAVE_PART_INFINITE_DEPTH &
-      (X0I, X0J, wavenumber,          &
+      (x, xi, n, wavenumber,          &
       tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-      SP, VSP)
-    ! Compute the wave part of the Green function in the infinite depth case.
-    ! This is mostly the integral computed by the subroutine above.
+      g, dgdn_sym, dgdn_antisym)
 
     ! Inputs
     REAL(KIND=PRE),                           INTENT(IN)  :: wavenumber
-    REAL(KIND=PRE), DIMENSION(3),             INTENT(IN)  :: X0I   ! Coordinates of the source point
-    REAL(KIND=PRE), DIMENSION(3),             INTENT(IN)  :: X0J   ! Coordinates of the center of the integration panel
+    REAL(KIND=PRE), DIMENSION(3),             INTENT(IN)  :: x, xi, n
 
     ! Tabulated data
-    REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_r_range
-    REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_z_range
-    REAL(KIND=PRE), DIMENSION(size(tabulated_r_range), size(tabulated_z_range), 2, 2), INTENT(IN) :: tabulated_integrals
+    REAL(KIND=PRE), DIMENSION(:),          INTENT(IN) :: tabulated_r_range
+    REAL(KIND=PRE), DIMENSION(:),          INTENT(IN) :: tabulated_z_range
+    REAL(KIND=PRE), DIMENSION(:, :, :, :), INTENT(IN) :: tabulated_integrals
 
     ! Outputs
-    COMPLEX(KIND=PRE),               INTENT(OUT) :: SP  ! Integral of the Green function over the panel.
-    COMPLEX(KIND=PRE), DIMENSION(3), INTENT(OUT) :: VSP ! Gradient of the integral of the Green function with respect to X0I.
+    complex(kind=pre), intent(out) :: g, dgdn_sym, dgdn_antisym
 
     ! Local variables
-    REAL(KIND=PRE), DIMENSION(3) :: XJ_REFLECTION
+    complex(kind=pre)               :: calG
+    complex(kind=pre), dimension(3) :: dcalGdx
+#ifndef XIE_CORRECTION
+    real(kind=pre) :: two_over_r1_cube
+    real(kind=pre), dimension(3) :: reflected_xi
+#endif
 
     ! The integrals
     CALL COLLECT_DELHOMMEAU_INTEGRALS(                           &
-      X0I, X0J, wavenumber,                                      &
+      x, xi, wavenumber,                                         &
       tabulated_r_range, tabulated_z_range, tabulated_integrals, &
-      SP, VSP(:))
-    SP  = 2*wavenumber*SP
-    VSP = 2*wavenumber**2*VSP
+      calG, dcalGdx)
+    g  = 2*wavenumber*calG
+    dgdn_antisym = 2*wavenumber**2*(dcalGdx(1)*n(1) + dcalGdx(2)*n(2))
+    dgdn_sym = 2*wavenumber**2*dcalGdx(3)*n(3)
 
 #ifndef XIE_CORRECTION
-    ! In the original Delhommeau method
-    XJ_REFLECTION(1:2) = X0J(1:2)
-    XJ_REFLECTION(3) = - X0J(3)
-    ! Only one singularity is missing in the derivative
-    VSP = VSP - 2*(X0I - XJ_REFLECTION)/(NORM2(X0I-XJ_REFLECTION)**3)
+    ! In the original Delhommeau method, a singularity is missing in the derivative
+    reflected_xi = [xi(1), xi(2), -xi(3)]
+    two_over_r1_cube = 2.0/(norm2(x-reflected_xi)**3)
+    dgdn_antisym = dgdn_antisym - ((x(1)-reflected_xi(1))*n(1) + (x(2)-reflected_xi(2))*n(2))*two_over_r1_cube
+    dgdn_sym = dgdn_sym - (x(3) - reflected_xi(3))*n(3)*two_over_r1_cube
 #endif
 
-    RETURN
-  END SUBROUTINE WAVE_PART_INFINITE_DEPTH
+  end subroutine wave_part_infinite_depth
 
   ! ======================
 
   SUBROUTINE WAVE_PART_FINITE_DEPTH &
-      (X0I, X0J, wavenumber, depth, &
+      (X0I, X0J, n, wavenumber, depth, &
       tabulated_r_range, tabulated_z_range, tabulated_integrals, &
       NEXP, AMBDA, AR,              &
-      SP, VSP_SYM, VSP_ANTISYM)
-    ! Compute the frequency-dependent part of the Green function in the finite depth case.
+      g, dgdn_sym, dgdn_antisym)
 
     ! Inputs
+    REAL(KIND=PRE), DIMENSION(3),             INTENT(IN) :: X0I, X0J, n
     REAL(KIND=PRE),                           INTENT(IN) :: wavenumber, depth
-    REAL(KIND=PRE), DIMENSION(3),             INTENT(IN) :: X0I  ! Coordinates of the source point
-    REAL(KIND=PRE), DIMENSION(3),             INTENT(IN) :: X0J  ! Coordinates of the center of the integration panel
 
     ! Tabulated data
-    REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_r_range
-    REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_z_range
-    REAL(KIND=PRE), DIMENSION(size(tabulated_r_range), size(tabulated_z_range), 2, 2), INTENT(IN) :: tabulated_integrals
+    REAL(KIND=PRE), DIMENSION(:),          INTENT(IN) :: tabulated_r_range
+    REAL(KIND=PRE), DIMENSION(:),          INTENT(IN) :: tabulated_z_range
+    REAL(KIND=PRE), DIMENSION(:, :, :, :), INTENT(IN) :: tabulated_integrals
 
     ! Prony decomposition for finite depth
     INTEGER,                                  INTENT(IN) :: NEXP
     REAL(KIND=PRE), DIMENSION(NEXP),          INTENT(IN) :: AMBDA, AR
 
     ! Outputs
-    COMPLEX(KIND=PRE),               INTENT(OUT) :: SP  ! Integral of the Green function over the panel.
-    COMPLEX(KIND=PRE), DIMENSION(3), INTENT(OUT) :: VSP_SYM, VSP_ANTISYM ! Gradient of the integral of the Green function with respect to X0I.
+    complex(kind=pre), intent(out) :: g, dgdn_sym, dgdn_antisym
 
     ! Local variables
     INTEGER                              :: KE
@@ -172,6 +141,8 @@ CONTAINS
     REAL(KIND=PRE),    DIMENSION(3)      :: XI, XJ
     REAL(KIND=PRE),    DIMENSION(4)      :: FTS, PSR
     REAL(KIND=PRE),    DIMENSION(3, 4)   :: VTS
+    COMPLEX(KIND=PRE)                    :: SP
+    COMPLEX(KIND=PRE), DIMENSION(3)      :: VSP_SYM, VSP_ANTISYM
     COMPLEX(KIND=PRE), DIMENSION(4)      :: FS
     COMPLEX(KIND=PRE), DIMENSION(3, 4)   :: VS
 
@@ -266,21 +237,25 @@ CONTAINS
 
       ! 2.a Shift observation point and compute integral
       XI(3) =  X0I(3) + depth*AMBDA(KE) - 2*depth
-      CALL COMPUTE_ASYMPTOTIC_RANKINE_SOURCE(XI(:), X0J(:), ONE, FTS(1), VTS(:, 1))
+      FTS(1) = one/norm2(XI - X0J)
+      VTS(:, 1) = (XI - X0J)*FTS(1)**3
 
       ! 2.b Shift and reflect observation point and compute integral
       XI(3) = -X0I(3) - depth*AMBDA(KE)
-      CALL COMPUTE_ASYMPTOTIC_RANKINE_SOURCE(XI(:), X0J(:), ONE, FTS(2), VTS(:, 2))
+      FTS(2) = one/norm2(XI - X0J)
+      VTS(:, 2) = (XI - X0J)*FTS(2)**3
       VTS(3, 2) = -VTS(3, 2) ! Reflection of the output vector
 
       ! 2.c Shift and reflect observation point and compute integral
       XI(3) = -X0I(3) + depth*AMBDA(KE) - 4*depth
-      CALL COMPUTE_ASYMPTOTIC_RANKINE_SOURCE(XI(:), X0J(:), ONE, FTS(3), VTS(:, 3))
+      FTS(3) = one/norm2(XI - X0J)
+      VTS(:, 3) = (XI - X0J)*FTS(3)**3
       VTS(3, 3) = -VTS(3, 3) ! Reflection of the output vector
 
       ! 2.d Shift observation point and compute integral
       XI(3) =  X0I(3) - depth*AMBDA(KE) + 2*depth
-      CALL COMPUTE_ASYMPTOTIC_RANKINE_SOURCE(XI(:), X0J(:), ONE, FTS(4), VTS(:, 4))
+      FTS(4) = one/norm2(XI - X0J)
+      VTS(:, 4) = (XI - X0J)*FTS(4)**3
 
       AQT = AR(KE)/2
 
@@ -291,7 +266,81 @@ CONTAINS
 
     END DO
 
-    RETURN
+    g = sp
+    dgdn_sym = dot_product(VSP_SYM, n)
+    dgdn_antisym = dot_product(VSP_ANTISYM, n)
   END SUBROUTINE
+
+  ! ======================
+
+  SUBROUTINE COLLECT_DELHOMMEAU_INTEGRALS                        &
+      (X0I, X0J, wavenumber,                                     &
+      tabulated_r_range, tabulated_z_range, tabulated_integrals, &
+      FS, VS)
+
+    ! Inputs
+    REAL(KIND=PRE), DIMENSION(3),             INTENT(IN) :: X0I, X0J
+    REAL(KIND=PRE),                           INTENT(IN) :: wavenumber
+
+    ! Tabulated data
+    REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_r_range
+    REAL(KIND=PRE), DIMENSION(:),             INTENT(IN) :: tabulated_z_range
+    REAL(KIND=PRE), DIMENSION(size(tabulated_r_range), size(tabulated_z_range), 2, 2), INTENT(IN) :: tabulated_integrals
+
+    ! Outputs
+    COMPLEX(KIND=PRE),                        INTENT(OUT) :: FS  ! the integral
+    COMPLEX(KIND=PRE), DIMENSION(3),          INTENT(OUT) :: VS  ! its gradient
+
+    ! Local variables
+    REAL(KIND=PRE) :: r, z, r1, drdx, drdy
+    REAL(KIND=PRE), dimension(2, 2) :: integrals
+
+    r = wavenumber * NORM2(X0I(1:2) - X0J(1:2))
+    z = wavenumber * (X0I(3) + X0J(3))
+    r1 = hypot(r, z)
+
+    IF (ABS(r) > 16*EPSILON(r)) THEN
+      drdx = wavenumber * (X0I(1) - X0J(1))/r
+      drdy = wavenumber * (X0I(2) - X0J(2))/r
+    ELSE
+      ! Limit when r->0 is not well defined...
+      drdx = ZERO
+      drdy = ZERO
+    END IF
+
+    IF (z > -1e-8) THEN
+      PRINT*, "Error: Impossible to compute the wave part of the Green function due to panels on the free surface (z=0) or above."
+      ERROR STOP
+    ENDIF
+
+    !=======================================================
+    ! Evaluate the elementary integrals depending on z and r
+    !=======================================================
+    IF ((MINVAL(tabulated_z_range) < z) .AND. (r < MAXVAL(tabulated_r_range))) THEN
+      ! Within the range of tabulated data
+      integrals = pick_in_default_tabulation(r, z, tabulated_r_range, tabulated_z_range, tabulated_integrals)
+
+    ELSE
+      ! Asymptotic expression for distant panels
+      integrals = asymptotic_approximations(MAX(r, 1e-10), z)
+    ENDIF
+
+    !================================================
+    ! Add the elementary integrals to build FS and VS
+    !================================================
+
+    FS    = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
+    VS(1) = -drdx * CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE)
+    VS(2) = -drdy * CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE)
+#ifdef XIE_CORRECTION
+    VS(3) = CMPLX(integrals(1, 2)/PI + ONE/r1, integrals(2, 2), KIND=PRE)
+#else
+    VS(3) = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
+#endif
+
+    RETURN
+  END SUBROUTINE COLLECT_DELHOMMEAU_INTEGRALS
+
+  ! =========================
 
 END MODULE GREEN_WAVE
