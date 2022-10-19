@@ -4,7 +4,8 @@ program test
 
   use matrices, only: build_matrices
   use delhommeau_integrals, only: default_r_spacing, default_z_spacing, construct_tabulation
-  use constants, only: pre  ! Floating point precision
+  use floating_point_precision, only: pre
+  use constants, only: zero
 
   implicit none
 
@@ -86,7 +87,7 @@ program test
     nb_vertices, nb_faces, vertices, faces,                      &
     face_center, face_normal, face_area, face_radius,            &
     nb_quadrature_points, quadrature_points, quadrature_weights, &
-    0d0, depth, coeffs,                                          &
+    ZERO, depth, coeffs,                                          &
     tabulated_r, tabulated_z, tabulated_integrals,               &
     nexp, ambda, ar,                                             &
     .true.,                                                      &
