@@ -2,6 +2,7 @@
 ! See LICENSE file at <https://github.com/mancellin/libDelhommeau>
 MODULE GREEN_WAVE
 
+  USE FLOATING_POINT_PRECISION, ONLY: PRE
   USE CONSTANTS
   USE DELHOMMEAU_INTEGRALS
   USE GREEN_RANKINE, ONLY: COMPUTE_ASYMPTOTIC_RANKINE_SOURCE
@@ -71,7 +72,6 @@ CONTAINS
     IF ((MINVAL(tabulated_z_range) < z) .AND. (r < MAXVAL(tabulated_r_range))) THEN
       ! Within the range of tabulated data
       integrals = pick_in_default_tabulation(r, z, tabulated_r_range, tabulated_z_range, tabulated_integrals)
-
     ELSE
       ! Asymptotic expression for distant panels
       integrals = asymptotic_approximations(MAX(r, 1e-10), z)

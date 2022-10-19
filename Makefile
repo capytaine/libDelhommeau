@@ -6,7 +6,8 @@ COMPILE_OPTIONS=$(DEBUG_COMPILE_OPTIONS) -cpp -fopenmp
 
 LIBDIR=./lib
 
-SRC=src/constants.f90\
+SRC=src/float64.f90\
+src/constants.f90\
 src/Green_Rankine.f90\
 src/Delhommeau_integrals.f90\
 src/Green_wave.f90\
