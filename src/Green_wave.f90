@@ -6,6 +6,9 @@ MODULE GREEN_WAVE
   USE CONSTANTS
   USE DELHOMMEAU_INTEGRALS
   USE GREEN_RANKINE, ONLY: COMPUTE_ASYMPTOTIC_RANKINE_SOURCE
+#ifdef LiangWuNoblesse
+  use greenfuncmod, only: havelockGF ! from LiangWuNoblesse
+#endif
 
   IMPLICIT NONE
 
@@ -47,10 +50,20 @@ CONTAINS
     ! Local variables
     REAL(KIND=PRE) :: r, z, r1, drdx, drdy
     REAL(KIND=PRE), dimension(2, 2) :: integrals
+#ifdef LiangWuNoblesse
+    complex(kind=pre), dimension(0:3) :: gf
+#endif
 
     r = wavenumber * NORM2(X0I(1:2) - X0J(1:2))
     z = wavenumber * (X0I(3) + X0J(3))
     r1 = hypot(r, z)
+
+#ifdef LiangWuNoblesse
+    call havelockgf(wavenumber*(x0i(1) - x0j(1)), wavenumber*(x0i(2) - x0j(2)), z, gf)
+    fs = -gf(0)/2
+    vs(1:2) = -gf(1:2)/2
+    vs(3) = -gf(3)/2 + 1/r1
+#else
 
     IF (ABS(r) > 16*EPSILON(r)) THEN
       drdx = wavenumber * (X0I(1) - X0J(1))/r
@@ -95,6 +108,7 @@ CONTAINS
     VS(3) = CMPLX(integrals(1, 2)/PI + ONE/r1, integrals(2, 2), KIND=PRE)
 #else
     VS(3) = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
+#endif
 #endif
 
     RETURN
