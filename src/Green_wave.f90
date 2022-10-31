@@ -88,13 +88,13 @@ CONTAINS
     ! Add the elementary integrals to build FS and VS
     !================================================
 
-    FS    = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
-    VS(1) = -drdx * CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE)
-    VS(2) = -drdy * CMPLX(integrals(1, 1)/PI, integrals(2, 1), KIND=PRE)
+    FS    = CMPLX(integrals(1, 2), integrals(2, 2), KIND=PRE)
+    VS(1) = -drdx * CMPLX(integrals(1, 1), integrals(2, 1), KIND=PRE)
+    VS(2) = -drdy * CMPLX(integrals(1, 1), integrals(2, 1), KIND=PRE)
 #ifdef XIE_CORRECTION
-    VS(3) = CMPLX(integrals(1, 2)/PI + ONE/r1, integrals(2, 2), KIND=PRE)
+    VS(3) = CMPLX(integrals(1, 2) + ONE/r1, integrals(2, 2), KIND=PRE)
 #else
-    VS(3) = CMPLX(integrals(1, 2)/PI, integrals(2, 2), KIND=PRE)
+    VS(3) = CMPLX(integrals(1, 2), integrals(2, 2), KIND=PRE)
 #endif
 
     RETURN

@@ -84,6 +84,8 @@ CONTAINS
     ENDIF
 #endif
 
+    coeffs(:) = coeffs(:)/(4*PI)
+
 
     !$OMP PARALLEL DO SCHEDULE(DYNAMIC) &
     !$OMP&  PRIVATE(J, I, SP1, VSP1, SP2, VSP2_SYM, VSP2_ANTISYM, reflected_centers_1_I, reflected_normals_1_I)
@@ -112,8 +114,8 @@ CONTAINS
             )
 
           ! Store into influence matrix
-          S(I, J) = S(I, J) - coeffs(1) * SP1/(4*PI)                                ! Green function
-          K(I, J) = K(I, J) - coeffs(1) * DOT_PRODUCT(normals_1(I, :), VSP1)/(4*PI) ! Gradient of the Green function
+          S(I, J) = S(I, J) - coeffs(1) * SP1                                ! Green function
+          K(I, J) = K(I, J) - coeffs(1) * DOT_PRODUCT(normals_1(I, :), VSP1) ! Gradient of the Green function
 
         END DO
       END IF
@@ -150,8 +152,8 @@ CONTAINS
             )
 
           ! Store into influence matrix
-          S(I, J) = S(I, J) - coeffs(2) * SP1/(4*PI)                                ! Green function
-          K(I, J) = K(I, J) - coeffs(2) * DOT_PRODUCT(reflected_normals_1_I(:), VSP1)/(4*PI) ! Gradient of the Green function
+          S(I, J) = S(I, J) - coeffs(2) * SP1                                ! Green function
+          K(I, J) = K(I, J) - coeffs(2) * DOT_PRODUCT(reflected_normals_1_I(:), VSP1) ! Gradient of the Green function
         END DO
       END IF
 
@@ -183,8 +185,8 @@ CONTAINS
                 )
             END IF
 
-            S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, Q)
-            K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
+            S(I, J) = S(I, J) - coeffs(3) * SP2 * quad_weights(J, Q)
+            K(I, J) = K(I, J) - coeffs(3) * &
               DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, Q)
 
           END DO
@@ -228,14 +230,14 @@ CONTAINS
               )
           END IF
 
-          S(I, J) = S(I, J) - coeffs(3)/(4*PI) * SP2 * quad_weights(J, 1)
-          K(I, J) = K(I, J) - coeffs(3)/(4*PI) * &
+          S(I, J) = S(I, J) - coeffs(3) * SP2 * quad_weights(J, 1)
+          K(I, J) = K(I, J) - coeffs(3) * &
             DOT_PRODUCT(normals_1(I, :), VSP2_SYM + VSP2_ANTISYM) * quad_weights(J, 1)
 
           IF (.NOT. I==J) THEN
             VSP2_SYM(1:2) = -VSP2_SYM(1:2)
-            S(J, I) = S(J, I) - coeffs(3)/(4*PI) * SP2 * quad_weights(I, 1)
-            K(J, I) = K(J, I) - coeffs(3)/(4*PI) * &
+            S(J, I) = S(J, I) - coeffs(3) * SP2 * quad_weights(I, 1)
+            K(J, I) = K(J, I) - coeffs(3) * &
               DOT_PRODUCT(normals_1(J, :), VSP2_SYM - VSP2_ANTISYM) * quad_weights(I, 1)
           END IF
         END DO
