@@ -85,6 +85,9 @@ contains
       integrals(2, 2) = integrals(2, 2) + delta_theta * real(exp_zeta)
     enddo
 
+    integrals(1, 1) = integrals(1, 1)/PI
+    integrals(1, 2) = integrals(1, 2)/PI
+
   contains
 
     pure function exp_e1(zz)
@@ -155,14 +158,14 @@ contains
     cos_kr  = cos(r - pi/4)
     sin_kr  = sin(r - pi/4)
 
-    integrals(1, 1) = pi*(expz_sqr*(cos_kr - sin_kr/(2*r)) - r/r1**3)
-    integrals(2, 1) =     expz_sqr*(sin_kr + cos_kr/(2*r))
+    integrals(1, 1) = expz_sqr*(cos_kr - sin_kr/(2*r)) - r/r1**3
+    integrals(2, 1) = expz_sqr*(sin_kr + cos_kr/(2*r))
 #ifdef XIE_CORRECTION
-    integrals(1, 2) = pi*(-expz_sqr*sin_kr + z/r1**3 - one/r1)
+    integrals(1, 2) = -expz_sqr*sin_kr + z/r1**3 - one/r1
 #else
-    integrals(1, 2) = pi*(-expz_sqr*sin_kr + z/r1**3)
+    integrals(1, 2) = -expz_sqr*sin_kr + z/r1**3
 #endif
-    integrals(2, 2) =     expz_sqr*cos_kr
+    integrals(2, 2) =  expz_sqr*cos_kr
 
   end function asymptotic_approximations
 
