@@ -259,7 +259,7 @@ CONTAINS
     VSP_SYM     = A*wavenumber*VSP_SYM
 
     !=====================================================
-    ! Part 2: Integrate (NEXP+1)×4 terms of the form 1/MM'
+    ! Part 2: Integrate (NEXP+1)x4 terms of the form 1/MM'
     !=====================================================
 
     DO KE = 1, NEXP
