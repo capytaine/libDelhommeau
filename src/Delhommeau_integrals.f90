@@ -1,17 +1,6 @@
 ! Copyright (C) 2022 Matthieu Ancellin
 ! See LICENSE file at <https://github.com/mancellin/capytaine>
 !
-! This module contains functions to evaluate the following integrals
-! D1 = Re[ ∫(-i cosθ)(J(ζ) - 1/ζ)dθ ]
-! D2 = Re[ ∫(-i cosθ)(e^ζ)dθ ]
-#ifdef XIE_CORRECTION
-! Z1 = Re[ ∫(J(ζ))dθ ]
-#else
-! Z1 = Re[ ∫(J(ζ) - 1/ζ)dθ ]
-#endif
-! Z2 = Re[ ∫(e^ζ)dθ ]
-! where ζ depends on θ, as well as two additional parameters `r ∈ [0, +∞)` and `z ∈ (-∞, 0]`.
-!
 ! They are required for the evaluation of the Green function and its gradient.
 !
 module delhommeau_integrals
@@ -91,7 +80,6 @@ contains
   contains
 
     pure function exp_e1(zz)
-      ! estimation of exp(z)·E1(z) where E1(z) = ∫_z^∞ exp(-t)/t dt
       ! see p.367 of G. Delhommeau thesis (referenced as [del]).
       ! the computation is done is single precision.
 

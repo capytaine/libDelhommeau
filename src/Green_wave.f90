@@ -199,12 +199,6 @@ CONTAINS
       FS(1), VS(:, 1))
 
 #ifndef XIE_CORRECTION
-    ! In the original Delhommeau method, the integrals are Re[ ∫(J(ζ) - 1/ζ)dθ ]/π + i Re[ ∫(e^ζ)dθ ]
-    ! whereas we need Re[ ∫(J(ζ))dθ ]/π + i Re[ ∫(e^ζ)dθ ]
-    ! So the term PSR is the difference because  Re[ ∫ 1/ζ dθ ] = - π/sqrt(r² + z²)
-    !
-    ! Note however, that the derivative part of Delhommeau integrals is the derivative of
-    ! Re[ ∫(J(ζ))dθ ]/π + i Re[ ∫(e^ζ)dθ ] so no fix is needed for the derivative.
     PSR(1) = ONE/(wavenumber*SQRT(R**2+(XI(3)+XJ(3))**2))
 #endif
 
